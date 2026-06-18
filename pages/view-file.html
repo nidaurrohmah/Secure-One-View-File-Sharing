@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buka File — SecureShare Platform</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg-primary); padding:20px; }
+    .viewer-wrap { width:100%; max-width:680px; }
+    .viewer-header { text-align:center; margin-bottom:28px; }
+    .viewer-header .logo-icon { width:52px;height:52px;background:linear-gradient(135deg,var(--accent-orange),#E67E00);border-radius:13px;display:inline-flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:10px; }
+    /* Validating state */
+    .state-validating { text-align:center; padding:60px 32px; }
+    .spinner { width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent-orange);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 20px; }
+    .lambda-logs { background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:left;margin-top:20px;font-family:monospace;font-size:0.78rem; }
+    .lambda-log-row { display:flex;gap:10px;margin-bottom:6px;animation:fadeIn 0.3s ease; }
+    .lambda-log-row:last-child { margin-bottom:0; }
+    .log-ts { color:var(--accent-orange);white-space:nowrap; }
+    .log-text { color:var(--text-secondary); }
+    /* Error state */
+    .state-error { text-align:center; padding:40px 32px; }
+    .error-icon { font-size:4rem; margin-bottom:20px; }
+    .error-reason { display:inline-block;padding:6px 14px;border-radius:20px;font-size:0.78rem;font-weight:600;margin-bottom:16px; }
+    .reason-EXPIRED { background:rgba(239,68,68,0.15);color:var(--danger);border:1px solid rgba(239,68,68,0.3); }
+    .reason-ALREADY_VIEWED { background:rgba(245,158,11,0.15);color:var(--warning);border:1px solid rgba(245,158,11,0.3); }
+    .reason-UNAUTHORIZED { background:rgba(79,70,229,0.15);color:#818CF8;border:1px solid rgba(79,70,229,0.3); }
+    .reason-INVALID_TOKEN { background:rgba(239,68,68,0.15);color:var(--danger);border:1px solid rgba(239,68,68,0.3); }
+    /* Success / viewer state */
+    .state-viewer { display:none; }
+    .state-viewer.show { display:block; animation:slideUp 0.4s ease; }
+    .file-card { background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden; }
+    .file-card-header { padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px; }
+    .file-card-icon { font-size:2.5rem; }
+    .file-card-name { font-size:1.1rem;font-weight:700; }
+    .file-card-meta { font-size:0.8rem;color:var(--text-muted);margin-top:4px; }
+    .file-card-body { padding:24px; }
+    .file-viewer { background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);min-height:200px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:20px; }
+    .file-viewer img { max-width:100%;max-height:500px;object-fit:contain; }
+    .file-viewer iframe { width:100%;height:500px;border:none; }
+    .file-viewer .no-preview { text-align:center;padding:40px;color:var(--text-muted); }
+    .file-viewer .no-preview .np-icon { font-size:3rem;margin-bottom:12px; }
+    /* One-view notice */
+    .self-destruct {
+      background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);
+      border-radius:var(--radius-md);padding:16px;text-align:center;
+    }
+    .sd-title { font-size:0.875rem;font-weight:700;color:var(--success);margin-bottom:4px; }
+    .sd-desc { font-size:0.8rem;color:var(--text-muted); }
+    .access-info { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px; }
+    .access-info-item { background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px; }
+    .access-info-label { font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px; }
+    .access-info-value { font-size:0.9rem;font-weight:600; }
+  </style>
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="viewer-wrap">
+    <div class="viewer-header">
+      <div class="logo-icon">🔐</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);">SecureShare — One-View File Viewer</div>
+    </div>
+
+    <!-- Validating state -->
+    <div class="card state-validating" id="state-validating">
+      <div class="spinner"></div>
+      <h3 style="margin-bottom:8px;">Memvalidasi Akses...</h3>
+      <p style="font-size:0.875rem;">AWS Lambda sedang memverifikasi identitas dan status file.</p>
+      <div class="lambda-logs" id="lambda-logs"></div>
+      <div style="margin-top:12px;"><span class="aws-badge">Lambda</span> &nbsp; <span class="aws-badge">DynamoDB</span> &nbsp; <span class="aws-badge">IAM</span></div>
+    </div>
+
+    <!-- Error state -->
+    <div class="card state-error" id="state-error" style="display:none">
+      <div class="error-icon" id="err-icon">❌</div>
+      <div class="error-reason" id="err-reason-badge"></div>
+      <h2 id="err-title" style="margin-bottom:12px;">Akses Ditolak</h2>
+      <p id="err-message" style="margin-bottom:24px;max-width:400px;margin-left:auto;margin-right:auto;"></p>
+      <div style="margin-bottom:24px;"><span class="aws-badge">Lambda Validation</span></div>
+      <div id="err-lambda-log" class="lambda-logs" style="text-align:left;max-width:420px;margin:0 auto 24px;"></div>
+      <a href="dashboard.html" class="btn btn-secondary">← Kembali ke Dashboard</a>
+    </div>
+
+    <!-- Success viewer state -->
+    <div class="state-viewer" id="state-viewer">
+      <div class="file-card">
+        <div class="file-card-header">
+          <div class="file-card-icon" id="view-icon">📎</div>
+          <div>
+            <div class="file-card-name" id="view-name">-</div>
+            <div class="file-card-meta" id="view-meta">-</div>
+          </div>
+          <span class="badge badge-viewed" style="margin-left:auto">👁️ One-View</span>
+        </div>
+        <div class="file-card-body">
+          <div class="access-info" id="access-info"></div>
+          <div class="file-viewer" id="file-viewer">
+            <div class="no-preview"><div class="np-icon">⏳</div><p>Memuat file...</p></div>
+          </div>
+          <!-- One-view notice -->
+          <div class="self-destruct" id="self-destruct">
+            <div class="sd-title">✅ One-View Active</div>
+            <div class="sd-desc">File tetap bisa dilihat selama halaman ini belum ditutup. Link tidak bisa dipakai ulang setelah halaman ditutup atau dibuka lagi.</div>
+            <div style="margin-top:10px;"><span class="aws-badge">DynamoDB: status=viewed</span> &nbsp; <span class="aws-badge">S3 private URL</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;text-align:center;">
+        <a href="dashboard.html" class="btn btn-secondary">← Kembali ke Dashboard</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/cloudwatch.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/storage.js"></script>
+  <script src="../js/share.js"></script>
+  <script src="../js/lambda.js"></script>
+  <script>
+    Auth.init();
+    const session = Auth.requireAuth();
+    if (!session) throw new Error('No session');
+
+    const token = Utils.param('token');
+    const logsEl = document.getElementById('lambda-logs');
+
+    function addLog(msg, delay = 0) {
+      return new Promise(r => setTimeout(() => {
+        const ts = new Date().toISOString().slice(11, 22);
+        const row = document.createElement('div');
+        row.className = 'lambda-log-row';
+        row.innerHTML = `<span class="log-ts">[${ts}]</span><span class="log-text">${msg}</span>`;
+        logsEl.appendChild(row);
+        r();
+      }, delay));
+    }
+
+    async function runValidation() {
+      if (!token) {
+        showError('INVALID_TOKEN', 'Tidak ada token di URL.', '⛔'); return;
+      }
+
+      await addLog('Lambda:validateAccess — INVOKED', 200);
+      await addLog(`Token: ${token.slice(0,12)}...`, 500);
+      await addLog('DynamoDB:GetItem — share record lookup...', 900);
+      await addLog('IAM: Checking user identity...', 1300);
+      await addLog('Checking expiry timestamp...', 1700);
+      await addLog('Checking view status...', 2100);
+      await addLog('Checking recipient authorization...', 2500);
+
+      const result = await Lambda.validateAccess(token, session.userId);
+      await new Promise(r => setTimeout(r, 400));
+
+      if (!result.ok) {
+        await addLog(`❌ VALIDATION FAILED: ${result.reason}`, 200);
+        showError(result.reason, result.message);
+      } else {
+        await addLog('✅ VALIDATION PASSED — Access granted', 200);
+        await addLog('DynamoDB: status updated to VIEWED — link locked', 400);
+        showViewer(result.share);
+      }
+    }
+
+    function showError(reason, message) {
+      document.getElementById('state-validating').style.display = 'none';
+      const iconMap = { EXPIRED: '⏰', ALREADY_VIEWED: '👁️', UNAUTHORIZED: '🚫', INVALID_TOKEN: '⛔' };
+      const titleMap = { EXPIRED: 'Link Sudah Expired', ALREADY_VIEWED: 'File Sudah Dibuka', UNAUTHORIZED: 'Akses Tidak Diizinkan', INVALID_TOKEN: 'Link Tidak Valid' };
+      document.getElementById('err-icon').textContent = iconMap[reason] || '❌';
+      document.getElementById('err-reason-badge').className = `error-reason reason-${reason}`;
+      document.getElementById('err-reason-badge').textContent = reason;
+      document.getElementById('err-title').textContent = titleMap[reason] || 'Akses Ditolak';
+      document.getElementById('err-message').textContent = message;
+      const ts = new Date().toISOString().slice(11, 22);
+      document.getElementById('err-lambda-log').innerHTML =
+        `<div class="lambda-log-row"><span class="log-ts">[${ts}]</span><span class="log-text" style="color:var(--danger)">Lambda:validateAccess — DENIED (${reason})</span></div>
+         <div class="lambda-log-row"><span class="log-ts">[${ts}]</span><span class="log-text">CloudWatch: Access denied event logged</span></div>`;
+      document.getElementById('state-error').style.display = 'block';
+    }
+
+    async function showViewer(share) {
+      document.getElementById('state-validating').style.display = 'none';
+      const viewer = document.getElementById('state-viewer');
+      viewer.classList.add('show');
+
+      document.getElementById('view-icon').textContent = Utils.fileIcon(share.fileName);
+      document.getElementById('view-name').textContent = share.fileName;
+      document.getElementById('view-meta').textContent = `Dari: ${share.senderName || share.senderEmail || '-'} • ${Utils.formatSize(share.fileSize || 0)} • tetap tampil selama halaman ini terbuka`;
+      document.getElementById('access-info').innerHTML = `
+        <div class="access-info-item"><div class="access-info-label">Dikirim oleh</div><div class="access-info-value">👤 ${share.senderName}</div></div>
+        <div class="access-info-item"><div class="access-info-label">Mode Akses</div><div class="access-info-value">Selama halaman terbuka</div></div>
+        <div class="access-info-item"><div class="access-info-label">Status Link</div><div class="access-info-value"><span class="badge badge-viewed">Sudah terkunci</span></div></div>
+        <div class="access-info-item"><div class="access-info-label">File ID</div><div class="access-info-value" style="font-family:monospace;font-size:0.75rem">${share.id.slice(0,16)}...</div></div>`;
+
+      // Render file preview
+      const fv = document.getElementById('file-viewer');
+      if (share.downloadUrl) {
+        const mime = share.contentType || '';
+        if (mime.startsWith('image/')) {
+          fv.innerHTML = `<img src="${share.downloadUrl}" alt="${share.fileName}" style="border-radius:8px;">`;
+        } else if (mime === 'application/pdf') {
+          fv.innerHTML = `<iframe src="${share.downloadUrl}"></iframe>`;
+        } else {
+          fv.innerHTML = `<div class="no-preview"><div class="np-icon">${Utils.fileIcon(share.fileName)}</div><p style="font-weight:600;">${share.fileName}</p><p>${Utils.formatSize(share.fileSize || 0)}</p><a href="${share.downloadUrl}" download="${share.fileName}" class="btn btn-primary" style="margin-top:16px;">⬇️ Download File</a></div>`;
+        }
+      } else {
+        fv.innerHTML = `<div class="no-preview"><div class="np-icon">📎</div><p>Preview tidak tersedia</p></div>`;
+      }
+
+      CloudWatch.log('LAMBDA', 'ONE_VIEW_LOCKED', `One-view link locked for ${share.id}`);
+    }
+
+    runValidation();
+  </script>
+</body>
+</html>

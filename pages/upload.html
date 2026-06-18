@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload File — SecureShare Platform</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .dropzone {
+      border: 2px dashed var(--border-light);
+      border-radius: var(--radius-xl);
+      padding: 60px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: var(--bg-secondary);
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent-orange);
+      background: rgba(255,153,0,0.05);
+      box-shadow: var(--shadow-glow-orange);
+    }
+    .dropzone .dz-icon { font-size: 3rem; margin-bottom: 16px; }
+    .dropzone h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+    .dropzone p { font-size: 0.875rem; color: var(--text-muted); }
+    .file-preview {
+      display: none;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-top: 20px;
+      align-items: center;
+      gap: 16px;
+    }
+    .file-preview.show { display: flex; }
+    .file-preview-icon { font-size: 2rem; }
+    .file-preview-info { flex: 1; }
+    .file-preview-name { font-weight: 600; font-size: 0.95rem; }
+    .file-preview-size { font-size: 0.8rem; color: var(--text-muted); margin-top: 3px; }
+    .upload-progress { display: none; margin-top: 20px; }
+    .upload-progress.show { display: block; }
+    .progress-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+    .user-select-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 8px; }
+    .user-card {
+      padding: 14px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-card:hover { border-color: var(--border-light); }
+    .user-card.selected { border-color: var(--accent-orange); background: rgba(255,153,0,0.07); }
+    .user-card-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), #818CF8); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .user-card-name { font-size: 0.875rem; font-weight: 600; }
+    .user-card-email { font-size: 0.75rem; color: var(--text-muted); }
+    .result-box { display: none; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); border-radius: var(--radius-lg); padding: 24px; margin-top: 24px; }
+    .result-box.show { display: block; animation: slideUp 0.4s ease; }
+    .result-box h3 { color: var(--success); font-size: 1rem; margin-bottom: 12px; }
+    .share-link-box { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 0.8rem; font-family: monospace; word-break: break-all; color: var(--text-secondary); margin-bottom: 12px; }
+    .sns-log { background: rgba(255,153,0,0.06); border: 1px solid rgba(255,153,0,0.15); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 0.8rem; }
+    .sns-log .log-row { display: flex; gap: 10px; margin-bottom: 6px; align-items: flex-start; }
+    .sns-log .log-row:last-child { margin-bottom: 0; }
+    .log-time { color: var(--accent-orange); font-family: monospace; white-space: nowrap; }
+    .log-msg { color: var(--text-secondary); }
+  </style>
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <nav class="navbar">
+    <a class="navbar-brand" href="dashboard.html">
+      <div class="logo-icon">🔐</div>
+      SecureShare
+    </a>
+    <div class="navbar-nav">
+      <a class="nav-link" href="dashboard.html">📊 Dashboard</a>
+      <a class="nav-link active" href="upload.html">⬆️ Upload</a>
+      <a class="nav-link" href="monitoring.html">📡 Monitoring</a>
+      <div style="position:relative">
+        <button class="notif-bell" id="notif-bell-btn" onclick="toggleNotifPanel()">🔔
+          <span class="notif-badge hidden" id="notif-badge">0</span>
+        </button>
+        <div class="notif-panel" id="notif-panel">
+          <div class="notif-panel-header"><h4>🔔 Notifikasi</h4></div>
+          <div class="notif-list" id="notif-list"></div>
+        </div>
+      </div>
+      <div class="user-avatar" id="user-avatar-btn">??</div>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <div class="page-header">
+      <h1 class="page-title">⬆️ Upload & Share File</h1>
+      <p class="page-subtitle">Upload file ke <span class="aws-badge">S3</span>, share ke user tertentu dengan sistem one-view aman.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;">
+      <!-- Left column -->
+      <div>
+        <!-- Step 1: Upload -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="section-title">
+            <span style="width:28px;height:28px;background:var(--accent-orange);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:700;color:#000;">1</span>
+            Upload File ke S3
+          </div>
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+            <div class="dz-icon">☁️</div>
+            <h3>Drag & Drop file di sini</h3>
+            <p>atau klik untuk memilih file</p>
+            <p style="margin-top:8px;font-size:0.75rem;">Semua format didukung • Maks 10MB</p>
+            <div style="margin-top:16px;"><span class="aws-badge">Amazon S3</span> &nbsp; <span class="aws-badge">CloudWatch</span></div>
+          </div>
+          <input type="file" id="file-input" style="display:none" onchange="handleFileSelect(this.files[0])">
+
+          <div class="file-preview" id="file-preview">
+            <div class="file-preview-icon" id="preview-icon">📎</div>
+            <div class="file-preview-info">
+              <div class="file-preview-name" id="preview-name">-</div>
+              <div class="file-preview-size" id="preview-size">-</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="clearFile()">✕</button>
+          </div>
+
+          <div class="upload-progress" id="upload-progress">
+            <div class="progress-label"><span>Uploading ke S3...</span><span id="prog-pct">0%</span></div>
+            <div class="progress"><div class="progress-bar" id="prog-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <!-- Step 2: Choose recipient -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="section-title">
+            <span style="width:28px;height:28px;background:var(--accent-blue);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:700;color:#fff;">2</span>
+            Pilih Penerima <span class="aws-badge" style="margin-left:8px">DynamoDB</span>
+          </div>
+          <p style="font-size:0.85rem;margin-bottom:12px;">File hanya bisa dibuka oleh user yang kamu pilih. Bukan public link!</p>
+          <div class="user-select-grid" id="user-grid">
+            <div class="empty-state" style="grid-column:1/-1;padding:20px"><p>Memuat user dari DynamoDB...</p></div>
+          </div>
+          <div class="form-group" id="recipient-email-fallback" style="display:none;margin-top:16px;margin-bottom:0">
+            <label class="form-label">Email penerima</label>
+            <input class="form-control" type="email" id="recipient-email-input" placeholder="email penerima yang sudah register">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">Dipakai kalau daftar user dari API belum bisa dimuat.</div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg btn-block" id="submit-btn" onclick="doUploadAndShare()" disabled>
+          🚀 Upload & Share Sekarang
+        </button>
+
+        <!-- Result -->
+        <div class="result-box" id="result-box">
+          <h3>✅ File berhasil di-share!</h3>
+          <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;" id="result-desc"></div>
+          <div class="share-link-box" id="result-link"></div>
+          <div class="sns-log" id="sns-log"></div>
+          <div style="display:flex;gap:10px;margin-top:16px;">
+            <button class="btn btn-secondary" onclick="copyLink()">📋 Copy Link</button>
+            <a href="dashboard.html" class="btn btn-primary">📊 Ke Dashboard</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Info panel -->
+      <div>
+        <div class="card card-glass" style="margin-bottom:16px;">
+          <h4 style="margin-bottom:12px;">🏗️ Alur Sistem</h4>
+          <div style="font-size:0.8rem;color:var(--text-muted);line-height:2;">
+            <div>1️⃣ File upload → <span class="aws-badge">S3 PutObject</span></div>
+            <div>2️⃣ Metadata → <span class="aws-badge">DynamoDB</span></div>
+            <div>3️⃣ Token dibuat → <span class="aws-badge">IAM</span></div>
+            <div>4️⃣ Notifikasi → <span class="aws-badge">SNS Email</span></div>
+            <div>5️⃣ Log → <span class="aws-badge">CloudWatch</span></div>
+          </div>
+        </div>
+        <div class="card card-glass" style="margin-bottom:16px;">
+          <h4 style="margin-bottom:12px;">🔒 One-View System</h4>
+          <p style="font-size:0.8rem;">Begitu file dibuka oleh penerima, <strong style="color:var(--accent-orange)">Lambda</strong> otomatis mencabut akses. Link menjadi invalid selamanya.</p>
+        </div>
+        <div class="card card-glass">
+          <h4 style="margin-bottom:12px;">📧 SNS Notification</h4>
+          <p style="font-size:0.8rem;">Penerima mendapat email notifikasi otomatis via <strong style="color:var(--accent-orange)">Amazon SNS</strong> saat file dikirim, dibuka, atau expired.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/cloudwatch.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/storage.js"></script>
+  <script src="../js/share.js"></script>
+  <script src="../js/lambda.js"></script>
+  <script>
+    Auth.init();
+    const session = Auth.requireAuth();
+    if (!session) throw new Error('No session');
+    document.getElementById('user-avatar-btn').textContent = session.avatar;
+    Notifications.updateBadge(session.userId);
+    Auth.loadUsers().then(() => {
+      const others = Auth.getOtherUsers(session.userId);
+      document.getElementById('user-grid').innerHTML = others.map(u => `
+        <div class="user-card" id="ucard-${u.id}" onclick="selectUser('${u.id}')">
+          <div class="user-card-avatar">${u.avatar}</div>
+          <div>
+            <div class="user-card-name">${u.name}</div>
+            <div class="user-card-email">${u.email}</div>
+          </div>
+        </div>`).join('') || `<div class="empty-state" style="grid-column:1/-1;padding:20px"><p>Belum ada user penerima. Daftarkan akun lain dulu.</p></div>`;
+    }).catch(err => {
+      document.getElementById('user-grid').innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:20px"><p>Gagal memuat daftar user: ${err.message}</p></div>`;
+      document.getElementById('recipient-email-fallback').style.display = 'block';
+      Utils.toast(err.message, 'danger');
+    });
+
+    let selectedFile = null;
+    let selectedRecipientId = null;
+    let selectedRecipientEmail = null;
+    const DEFAULT_ACCESS_MINUTES = 30;
+    let uploadedFileObj = null;
+
+    document.getElementById('recipient-email-input').addEventListener('input', (e) => {
+      selectedRecipientEmail = e.target.value.trim();
+      selectedRecipientId = null;
+      document.querySelectorAll('.user-card').forEach(c => c.classList.remove('selected'));
+      checkReady();
+    });
+
+    // Dropzone
+    const dz = document.getElementById('dropzone');
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+    dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]); });
+
+    function handleFileSelect(file) {
+      if (file.size > 10 * 1024 * 1024) { Utils.toast('File terlalu besar! Maks 10MB', 'danger'); return; }
+      selectedFile = file;
+      document.getElementById('preview-icon').textContent = Utils.fileIcon(file.name);
+      document.getElementById('preview-name').textContent = file.name;
+      document.getElementById('preview-size').textContent = Utils.formatSize(file.size);
+      document.getElementById('file-preview').classList.add('show');
+      checkReady();
+    }
+
+    function clearFile() {
+      selectedFile = null; uploadedFileObj = null;
+      document.getElementById('file-preview').classList.remove('show');
+      document.getElementById('file-input').value = '';
+      checkReady();
+    }
+
+    function selectUser(id) {
+      selectedRecipientId = id;
+      selectedRecipientEmail = null;
+      document.getElementById('recipient-email-input').value = '';
+      document.querySelectorAll('.user-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById('ucard-' + id).classList.add('selected');
+      checkReady();
+    }
+
+    function checkReady() {
+      document.getElementById('submit-btn').disabled = !(selectedFile && (selectedRecipientId || selectedRecipientEmail));
+    }
+
+    async function doUploadAndShare() {
+      if (!selectedFile || (!selectedRecipientId && !selectedRecipientEmail)) return;
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+
+      // Show progress
+      const prog = document.getElementById('upload-progress');
+      const bar = document.getElementById('prog-bar');
+      const pct = document.getElementById('prog-pct');
+      prog.classList.add('show');
+
+      // Simulate upload progress
+      for (let i = 0; i <= 90; i += 10) {
+        bar.style.width = i + '%'; pct.textContent = i + '%';
+        await new Promise(r => setTimeout(r, 80));
+      }
+
+      try {
+        // Upload to private S3 via presigned URL
+        uploadedFileObj = await Storage.upload(selectedFile, session.userId);
+        bar.style.width = '100%'; pct.textContent = '100%';
+        await new Promise(r => setTimeout(r, 300));
+
+        // Create share record → DynamoDB
+        const result = selectedRecipientId
+          ? await Share.create(uploadedFileObj.id, session.userId, selectedRecipientId, DEFAULT_ACCESS_MINUTES)
+          : await Share.createByEmail(uploadedFileObj.id, selectedRecipientEmail, DEFAULT_ACCESS_MINUTES);
+        if (!result.ok) { Utils.toast(result.error, 'danger'); btn.disabled = false; return; }
+
+        const share = result.share;
+        const recipient = selectedRecipientId ? Auth.getUserById(selectedRecipientId) : { name: selectedRecipientEmail, email: selectedRecipientEmail };
+
+        // Show result
+        document.getElementById('result-desc').innerHTML =
+          `File <strong>${selectedFile.name}</strong> berhasil dikirim ke <strong>${recipient.name}</strong>. ` +
+          `Akses one-view siap dibuka oleh penerima.`;
+        document.getElementById('result-link').textContent = share.shareUrl;
+
+        const now = new Date().toISOString().slice(11, 19);
+        document.getElementById('sns-log').innerHTML = `
+          <div style="font-size:0.78rem;font-weight:600;color:var(--accent-orange);margin-bottom:8px;">📡 SNS Activity Log</div>
+          <div class="log-row"><span class="log-time">[${now}]</span><span class="log-msg">S3 PutObject: ${selectedFile.name} → ${uploadedFileObj.s3Key}</span></div>
+          <div class="log-row"><span class="log-time">[${now}]</span><span class="log-msg">DynamoDB PutItem: share record created (${share.id.slice(0,8)}...)</span></div>
+          <div class="log-row"><span class="log-time">[${now}]</span><span class="log-msg">SNS Publish: Email notification → ${recipient.email}</span></div>
+          <div class="log-row"><span class="log-time">[${now}]</span><span class="log-msg">CloudWatch: Activity logged ✓</span></div>`;
+
+        document.getElementById('result-box').classList.add('show');
+        prog.classList.remove('show');
+      } catch (err) {
+        Utils.toast('Upload gagal: ' + err.message, 'danger');
+        btn.disabled = false;
+      }
+    }
+
+    function copyLink() {
+      const link = document.getElementById('result-link').textContent;
+      navigator.clipboard.writeText(link).then(() => Utils.toast('Link berhasil disalin!', 'success')).catch(() => Utils.toast('Copy manual ya 😊', 'info'));
+    }
+
+    function toggleNotifPanel() {
+      document.getElementById('notif-panel').classList.toggle('active');
+      Notifications.renderPanel(session.userId);
+    }
+  </script>
+</body>
+</html>

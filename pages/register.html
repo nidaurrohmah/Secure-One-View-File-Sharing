@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — SecureShare Platform</title>
+  <meta name="description" content="Buat akun baru di SecureShare untuk mulai berbagi file secara aman">
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg-primary); padding: 20px; }
+    .auth-bg {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse at 80% 50%, rgba(79,70,229,0.15) 0%, transparent 60%),
+                  radial-gradient(ellipse at 20% 80%, rgba(255,153,0,0.1) 0%, transparent 50%);
+    }
+    .auth-wrap { position: relative; z-index: 1; width: 100%; max-width: 460px; }
+    .auth-logo { text-align: center; margin-bottom: 28px; }
+    .auth-logo .logo-icon { width: 52px; height: 52px; background: linear-gradient(135deg, var(--accent-orange), #E67E00); border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 10px; }
+    .auth-logo h1 { font-size: 1.4rem; font-weight: 800; }
+    .auth-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 32px; }
+    .auth-card h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 4px; }
+    .auth-card .subtitle { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px; }
+    .error-msg { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--danger); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 16px; display: none; }
+    .auth-footer { text-align: center; margin-top: 20px; font-size: 0.85rem; color: var(--text-muted); }
+    .auth-footer a { color: var(--accent-orange); font-weight: 600; }
+    .aws-info { margin-top: 20px; padding: 14px; background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); border-radius: var(--radius-sm); }
+    .aws-info p { font-size: 0.78rem; color: var(--text-muted); }
+    .aws-info strong { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="auth-bg"></div>
+  <div class="auth-wrap animate-fade-in">
+    <div class="auth-logo">
+      <div class="logo-icon">🔐</div>
+      <h1>SecureShare</h1>
+    </div>
+    <div class="auth-card">
+      <h2>Buat Akun Baru</h2>
+      <p class="subtitle">Daftar untuk mulai berbagi file secara aman dengan sistem one-view.</p>
+      <div class="error-msg" id="error-msg"></div>
+      <form id="register-form">
+        <div class="form-group">
+          <label class="form-label" for="name">Nama Lengkap</label>
+          <input class="form-control" type="text" id="name" placeholder="Nama lengkapmu" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <input class="form-control" type="email" id="email" placeholder="nama@email.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input class="form-control" type="password" id="password" placeholder="Min. 6 karakter" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="confirm-password">Konfirmasi Password</label>
+          <input class="form-control" type="password" id="confirm-password" placeholder="Ulangi password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="register-btn">
+          ✨ Buat Akun
+        </button>
+      </form>
+      <div class="aws-info">
+        <p>🗄️ <strong>DynamoDB</strong> — Data akunmu disimpan aman di cloud database</p>
+      </div>
+    </div>
+    <div class="auth-footer">
+      Sudah punya akun? <a href="login.html">Masuk di sini</a>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/cloudwatch.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    Auth.init();
+    if (Auth.getSession()) Utils.redirect('dashboard.html');
+
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('register-btn');
+      const err = document.getElementById('error-msg');
+      err.style.display = 'none';
+
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const pass = document.getElementById('password').value;
+      const confirm = document.getElementById('confirm-password').value;
+
+      if (pass !== confirm) {
+        err.textContent = 'Password tidak cocok.'; err.style.display = 'block'; return;
+      }
+
+      btn.classList.add('btn-loading'); btn.textContent = '';
+      await new Promise(r => setTimeout(r, 800));
+      btn.classList.remove('btn-loading'); btn.textContent = '✨ Buat Akun';
+
+      const result = await Auth.register(name, email, pass);
+      if (!result.ok) {
+        err.textContent = result.error; err.style.display = 'block';
+      } else {
+        Utils.redirect('dashboard.html');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — SecureShare Platform</title>
+  <meta name="description" content="Dashboard utama SecureShare — kelola file sharing kamu">
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .hero-banner {
+      background: linear-gradient(135deg, rgba(79,70,229,0.2), rgba(255,153,0,0.1));
+      border: 1px solid rgba(255,153,0,0.2);
+      border-radius: var(--radius-xl);
+      padding: 28px 32px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .hero-banner h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+    .hero-banner p { font-size: 0.875rem; color: var(--text-muted); }
+    .hero-actions { display: flex; gap: 10px; flex-shrink: 0; }
+    .section-title { font-size: 1rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .tabs { display: flex; gap: 4px; background: var(--bg-secondary); padding: 4px; border-radius: var(--radius-sm); margin-bottom: 20px; width: fit-content; }
+    .tab-btn { padding: 8px 18px; border-radius: 6px; border: none; background: none; color: var(--text-muted); font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: var(--transition); font-family: inherit; }
+    .tab-btn.active { background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+    .file-row { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid rgba(45,55,72,0.4); transition: var(--transition); }
+    .file-row:last-child { border-bottom: none; }
+    .file-row:hover { background: rgba(255,255,255,0.02); }
+    .file-icon-wrap { width: 44px; height: 44px; background: var(--bg-secondary); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .file-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .share-arrow { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-muted); }
+    .user-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: var(--bg-secondary); border-radius: 20px; font-size: 0.78rem; font-weight: 500; }
+    .user-chip .chip-avatar { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-blue), var(--accent-blue-light)); display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 700; color: #fff; }
+    .aws-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .expiry-bar { height: 3px; border-radius: 2px; margin-top: 6px; background: var(--bg-secondary); }
+    .expiry-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--success), var(--warning)); transition: width 0.5s; }
+    .expiry-fill.urgent { background: var(--danger); }
+    .stat-card.orange { border-color: rgba(255,153,0,0.3); }
+    .stat-card.blue { border-color: rgba(79,70,229,0.3); }
+    .stat-card.green { border-color: rgba(16,185,129,0.3); }
+    .stat-card.red { border-color: rgba(239,68,68,0.3); }
+  </style>
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a class="navbar-brand" href="dashboard.html">
+      <div class="logo-icon">🔐</div>
+      SecureShare
+    </a>
+    <div class="navbar-nav">
+      <a class="nav-link active" href="dashboard.html">📊 Dashboard</a>
+      <a class="nav-link" href="upload.html">⬆️ Upload</a>
+      <a class="nav-link" href="monitoring.html">📡 Monitoring</a>
+      <div style="position:relative">
+        <button class="notif-bell" id="notif-bell-btn" onclick="toggleNotifPanel()">🔔
+          <span class="notif-badge hidden" id="notif-badge">0</span>
+        </button>
+        <div class="notif-panel" id="notif-panel">
+          <div class="notif-panel-header">
+            <h4>🔔 Notifikasi <span class="aws-badge">SNS</span></h4>
+            <button class="btn btn-ghost btn-sm" onclick="Notifications.markAllRead(session.userId); Notifications.updateBadge(session.userId); Notifications.renderPanel(session.userId);">Tandai baca</button>
+          </div>
+          <div class="notif-list" id="notif-list"></div>
+        </div>
+      </div>
+      <div class="user-avatar" id="user-avatar-btn" onclick="toggleUserMenu()">??</div>
+      <div id="user-menu" style="display:none;position:absolute;top:72px;right:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px;box-shadow:var(--shadow-lg);z-index:200;min-width:180px;">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border);margin-bottom:8px;">
+          <div style="font-size:0.85rem;font-weight:600;" id="menu-name">-</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);" id="menu-email">-</div>
+        </div>
+        <button class="btn btn-ghost btn-sm btn-block" style="justify-content:flex-start;" onclick="doLogout()">🚪 Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <!-- Hero -->
+    <div class="hero-banner">
+      <div>
+        <h2>Selamat datang, <span id="user-greeting">User</span>! 👋</h2>
+        <p>Kelola file sharing kamu dengan aman menggunakan teknologi AWS cloud.</p>
+        <div class="aws-strip" style="margin-top:12px;margin-bottom:0">
+          <span class="aws-badge">EC2</span>
+          <span class="aws-badge">S3</span>
+          <span class="aws-badge">DynamoDB</span>
+          <span class="aws-badge">Lambda</span>
+          <span class="aws-badge">SNS</span>
+          <span class="aws-badge">CloudWatch</span>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <a href="upload.html" class="btn btn-primary btn-lg">⬆️ Upload & Share</a>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" style="margin-bottom:28px;" id="stats-grid">
+      <div class="stat-card orange">
+        <div class="stat-icon">📤</div>
+        <div class="stat-value" id="stat-sent">0</div>
+        <div class="stat-label">Total Dikirim</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-icon">📥</div>
+        <div class="stat-value" id="stat-received">0</div>
+        <div class="stat-label">Total Diterima</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(245,158,11,0.3)">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-value" id="stat-pending">0</div>
+        <div class="stat-label">Menunggu Dibuka</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-icon">👁️</div>
+        <div class="stat-value" id="stat-viewed">0</div>
+        <div class="stat-label">Sudah Dilihat</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:20px 24px 0;">
+        <div class="tabs">
+          <button class="tab-btn active" id="tab-received" onclick="switchTab('received')">📥 Diterima</button>
+          <button class="tab-btn" id="tab-sent" onclick="switchTab('sent')">📤 Dikirim</button>
+        </div>
+      </div>
+
+      <!-- Received files -->
+      <div id="panel-received">
+        <div id="received-list"></div>
+      </div>
+
+      <!-- Sent files -->
+      <div id="panel-sent" style="display:none">
+        <div id="sent-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share Modal -->
+  <div class="modal-overlay" id="share-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">📤 Share File ke User</h3>
+        <button class="modal-close" onclick="closeShareModal()">✕</button>
+      </div>
+      <div id="share-file-info" style="padding:12px;background:var(--bg-secondary);border-radius:var(--radius-sm);margin-bottom:20px;font-size:0.875rem;"></div>
+      <div class="form-group">
+        <label class="form-label">Kirim ke User</label>
+        <select class="form-control" id="share-recipient"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Waktu Akses (menit)</label>
+        <input class="form-control" type="number" id="share-expiry" value="30" min="5" max="1440">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">Default: 30 menit (sesuai pre-signed URL S3)</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeShareModal()">Batal</button>
+        <button class="btn btn-primary" style="flex:1" onclick="doShare()" id="share-btn">📤 Kirim File</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/cloudwatch.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/notifications.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/storage.js"></script>
+  <script src="../js/share.js"></script>
+  <script src="../js/lambda.js"></script>
+  <script>
+    Auth.init();
+    const session = Auth.requireAuth();
+    if (!session) throw new Error('No session');
+
+    // Init UI
+    document.getElementById('user-greeting').textContent = session.name.split(' ')[0];
+    document.getElementById('user-avatar-btn').textContent = session.avatar;
+    document.getElementById('menu-name').textContent = session.name;
+    document.getElementById('menu-email').textContent = session.email;
+    Notifications.updateBadge(session.userId);
+    Notifications.renderPanel(session.userId);
+    Promise.allSettled([
+      Auth.loadUsers(),
+      Storage.refresh(),
+      Share.refresh(),
+      CloudWatch.refresh()
+    ]).then((results) => {
+      const failed = results.find(r => r.status === 'rejected');
+      if (failed) Utils.toast(failed.reason.message, 'warning');
+      Notifications.updateBadge(session.userId);
+      Notifications.renderPanel(session.userId);
+      renderStats();
+      renderReceived();
+    });
+
+    let currentFileId = null;
+
+    function renderStats() {
+      const s = Share.getStats(session.userId);
+      document.getElementById('stat-sent').textContent = s.totalSent;
+      document.getElementById('stat-received').textContent = s.totalReceived;
+      document.getElementById('stat-pending').textContent = s.pending;
+      document.getElementById('stat-viewed').textContent = s.viewed;
+    }
+
+    function switchTab(tab) {
+      document.getElementById('tab-received').classList.toggle('active', tab === 'received');
+      document.getElementById('tab-sent').classList.toggle('active', tab === 'sent');
+      document.getElementById('panel-received').style.display = tab === 'received' ? '' : 'none';
+      document.getElementById('panel-sent').style.display = tab === 'sent' ? '' : 'none';
+      if (tab === 'sent') renderSent(); else renderReceived();
+    }
+
+    function statusBadge(s) {
+      const map = { pending: '⏳ Pending', viewed: '👁️ Viewed', expired: '💀 Expired' };
+      return `<span class="badge badge-${s}">${map[s] || s}</span>`;
+    }
+
+    function expiryPct(share) {
+      const total = new Date(share.expiresAt) - new Date(share.createdAt);
+      const left = new Date(share.expiresAt) - Date.now();
+      const pct = Math.max(0, Math.min(100, (left / total) * 100));
+      return { pct, urgent: pct < 20 };
+    }
+
+    function renderReceived() {
+      const shares = Share.getByRecipient(session.userId);
+      const el = document.getElementById('received-list');
+      if (!shares.length) {
+        el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><h3>Belum ada file diterima</h3><p>File yang dikirim orang lain ke kamu akan muncul di sini.</p></div>`;
+        return;
+      }
+      el.innerHTML = shares.map(s => {
+        const ep = expiryPct(s);
+        return `<div class="file-row">
+          <div class="file-icon-wrap">${Utils.fileIcon(s.fileName)}</div>
+          <div class="file-info">
+            <div class="file-name">${Utils.truncate(s.fileName, 40)}</div>
+            <div class="file-meta">
+              <span>📤 Dari: <strong>${s.senderName}</strong></span>
+              <span>📅 ${Utils.formatDateTime(s.createdAt)}</span>
+              <span>💾 ${Utils.formatSize(s.fileSize || 0)}</span>
+            </div>
+            ${s.status === 'pending' ? `<div class="expiry-bar"><div class="expiry-fill ${ep.urgent ? 'urgent' : ''}" style="width:${ep.pct}%"></div></div>` : ''}
+            ${s.status === 'pending' ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px;">⏱️ Expired: ${Utils.formatDateTime(s.expiresAt)}</div>` : ''}
+          </div>
+          <div class="file-actions">
+            ${statusBadge(s.status)}
+            ${s.status === 'pending' ? `<a href="view-file.html?token=${s.token}" class="btn btn-primary btn-sm">👁️ Buka</a>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderSent() {
+      const shares = Share.getBySender(session.userId);
+      const files = Storage.getByOwner(session.userId);
+      const el = document.getElementById('sent-list');
+      if (!shares.length && !files.length) {
+        el.innerHTML = `<div class="empty-state"><div class="empty-icon">📤</div><h3>Belum ada file dikirim</h3><p>Upload dan share file pertamamu!</p><br><a href="upload.html" class="btn btn-primary">⬆️ Upload File</a></div>`;
+        return;
+      }
+      // Show uploaded files not yet shared
+      const sharedFileIds = shares.map(s => s.fileId);
+      const unsharedFiles = files.filter(f => !sharedFileIds.includes(f.id));
+      let html = '';
+      if (unsharedFiles.length) {
+        html += `<div style="padding:12px 20px;font-size:0.78rem;color:var(--text-muted);background:rgba(255,153,0,0.04);border-bottom:1px solid var(--border);">📁 File di S3 (belum dibagikan)</div>`;
+        html += unsharedFiles.map(f => `
+          <div class="file-row">
+            <div class="file-icon-wrap">${Utils.fileIcon(f.name)}</div>
+            <div class="file-info">
+              <div class="file-name">${Utils.truncate(f.name, 40)}</div>
+              <div class="file-meta"><span>💾 ${Utils.formatSize(f.size)}</span><span>📅 ${Utils.formatDateTime(f.uploadedAt)}</span><span class="aws-badge">S3</span></div>
+            </div>
+            <div class="file-actions">
+              <button class="btn btn-primary btn-sm" onclick="openShareModal('${f.id}','${f.name}',${f.size})">📤 Share</button>
+            </div>
+          </div>`).join('');
+      }
+      if (shares.length) {
+        html += `<div style="padding:12px 20px;font-size:0.78rem;color:var(--text-muted);background:rgba(79,70,229,0.04);border-bottom:1px solid var(--border);border-top:1px solid var(--border);">📤 Riwayat Share</div>`;
+        html += shares.map(s => `
+          <div class="file-row">
+            <div class="file-icon-wrap">${Utils.fileIcon(s.fileName)}</div>
+            <div class="file-info">
+              <div class="file-name">${Utils.truncate(s.fileName, 35)}</div>
+              <div class="file-meta">
+                <span>📩 Ke: <strong>${s.recipientName}</strong></span>
+                <span>📅 ${Utils.formatDateTime(s.createdAt)}</span>
+                ${s.viewedAt ? `<span>👁️ Dibuka: ${Utils.formatDateTime(s.viewedAt)}</span>` : ''}
+              </div>
+            </div>
+            <div class="file-actions">${statusBadge(s.status)}</div>
+          </div>`).join('');
+      }
+      el.innerHTML = html;
+    }
+
+    function openShareModal(fileId, fileName, fileSize) {
+      currentFileId = fileId;
+      document.getElementById('share-file-info').innerHTML = `${Utils.fileIcon(fileName)} <strong>${fileName}</strong> &nbsp; ${Utils.formatSize(fileSize)}`;
+      const sel = document.getElementById('share-recipient');
+      const others = Auth.getOtherUsers(session.userId);
+      sel.innerHTML = others.map(u => `<option value="${u.id}">${u.name} (${u.email})</option>`).join('');
+      document.getElementById('share-modal').classList.add('active');
+    }
+
+    function closeShareModal() { document.getElementById('share-modal').classList.remove('active'); currentFileId = null; }
+
+    async function doShare() {
+      if (!currentFileId) return;
+      const recipientId = document.getElementById('share-recipient').value;
+      const expiry = parseInt(document.getElementById('share-expiry').value) || 30;
+      const btn = document.getElementById('share-btn');
+      btn.classList.add('btn-loading'); btn.textContent = '';
+      await new Promise(r => setTimeout(r, 600));
+      btn.classList.remove('btn-loading'); btn.textContent = '📤 Kirim File';
+      const result = await Share.create(currentFileId, session.userId, recipientId, expiry);
+      if (result.ok) {
+        closeShareModal();
+        renderStats(); renderSent();
+        Notifications.updateBadge(session.userId);
+      } else {
+        Utils.toast(result.error, 'danger');
+      }
+    }
+
+    function toggleNotifPanel() {
+      const panel = document.getElementById('notif-panel');
+      panel.classList.toggle('active');
+      if (panel.classList.contains('active')) {
+        Notifications.renderPanel(session.userId);
+        Notifications.markAllRead(session.userId);
+        Notifications.updateBadge(session.userId);
+      }
+    }
+    function toggleUserMenu() {
+      const m = document.getElementById('user-menu');
+      m.style.display = m.style.display === 'none' ? 'block' : 'none';
+    }
+    function doLogout() { Auth.logout(); Utils.redirect('login.html'); }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#notif-bell-btn') && !e.target.closest('#notif-panel')) document.getElementById('notif-panel').classList.remove('active');
+      if (!e.target.closest('#user-avatar-btn') && !e.target.closest('#user-menu')) document.getElementById('user-menu').style.display = 'none';
+    });
+  </script>
+</body>
+</html>

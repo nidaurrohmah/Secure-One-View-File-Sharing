@@ -1,0 +1,16 @@
+{
+  "name": "secure-oneview-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test:syntax": "node --check handlers/register.mjs && node --check handlers/login.mjs && node --check handlers/list-users.mjs && node --check handlers/create-upload-url.mjs && node --check handlers/complete-upload.mjs && node --check handlers/list-files.mjs && node --check handlers/create-share.mjs && node --check handlers/list-shares.mjs && node --check handlers/validate-share.mjs && node --check handlers/expire-shares.mjs && node --check handlers/monitoring.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/client-sns": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0"
+  }
+}
